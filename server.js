@@ -1,23 +1,30 @@
-//Express server setup
 var express = require('express');
 var router = express();
-var port = process.env.PORT || 8080;
+
+let mongoose = require('mongoose');
+let bodyParser = require('body-parser');
+let port = process.env.PORT || 8080;
+let config = require('config'); // load the db location from the JSON files
+let user = require('./app/routes/user');
+
+router.use(bodyParser.json());                                     
+router.use(bodyParser.urlencoded({extended: true}));               
+router.use(bodyParser.text());                                    
+router.use(bodyParser.json({ type: 'application/json'}));
+
+//db connection      
+mongoose.connect(config.DBHost);
+let db = mongoose.connection;
+db.on('error', console.error.bind(console, 'connection error:'));
+
+router.get("/", (req, res) => res.json({message: "Welcome to our Bookstore!"}));
+
+router.route("/user")
+    .get(user.getUsers)
+    .post(user.createUser);
+
 router.listen(port);
-
-//Database setup
-var MongoClient = require('mongodb').MongoClient;
-var mongoURI = 'mongodb://localhost:27017/'
-var db_name = "GROUP_SHOPPING_LIST"
-var db_user = "foo"
-var db_pswd = "bar"
-
-MongoClient.connect(mongoURI + db_name, function(err, db) {
-    if (err == null) {
-        
-    }
-    else {
-        throw err;
-    }
+console.log("Listening on port " + port);
 
 //   if (err) {
 //     throw err;
@@ -534,5 +541,4 @@ MongoClient.connect(mongoURI + db_name, function(err, db) {
 //     });
 //     }
 
-});
 module.exports = router;

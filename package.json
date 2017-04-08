@@ -3,18 +3,18 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "start": "node node_modules/react-native/local-cli/cli.js start",
-    "test": "jest"
+    "start": "NODE_ENV=dev && node server.js",
+    "test": "mocha"
   },
   "dependencies": {
     "express": "^4.14.0",
     "mongo": "^0.1.0",
+    "mongoose": "^4.9.3",
     "react": "15.4.1",
     "react-native": "0.38.0",
+    "config": "^1.25.1",
     "react-native-action-button": "^2.0.16",
-    "react-native-camera": "git+https://github.com/lwansbrough/react-native-camera.git",
     "react-native-communications": "^2.1.4",
-    "react-native-image-picker": "^0.24.1",
     "react-native-material-design": "^0.3.7",
     "react-native-pull": "^1.1.2",
     "react-native-vector-icons": "^3.0.0",
@@ -24,9 +24,9 @@
     "preset": "react-native"
   },
   "devDependencies": {
-    "babel-jest": "17.0.2",
-    "babel-preset-react-native": "1.9.0",
-    "jest": "17.0.3",
-    "react-test-renderer": "15.4.1"
+    "react-native": "^0.38.0",
+    "chai": "^3.5.0",
+    "chai-http": "^3.0.0",
+    "mocha": "^3.2.0"
   }
 }
