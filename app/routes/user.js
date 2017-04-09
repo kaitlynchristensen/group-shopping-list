@@ -22,13 +22,69 @@ function getUsers(req, res) {
  * Creates a new user
  */
 function createUser(req, res) {
-    var newUser = new User(req.body);
-    newUser.save((err, user) => {
+    var validateUserDataResult = validateUserData(req.body);
+    if (validateUserDataResult.isValid) {
+
+        usernameAlreadyExists(req.body.username, function(isDuplicate) {
+            if (!isDuplicate) {
+                var newUser = new User(req.body);
+
+                newUser.save((err, user) => {
+                    if (err == null) {
+                        res.json({ message: "You have successfully created a new user", user });
+                    }
+                    else {
+                        res.send(err);
+                    }
+                });
+            }
+            else {
+                res.status(406).json({ message: "That username already exists. Try another one." });
+            }
+        });
+    }
+    else {
+        res.status(406).json({ message: validateUserDataResult.message });
+    }
+
+}
+
+function validateUserData(userData) {
+    var result = true;
+    var message = "";
+    if (!userData.hasOwnProperty('username')) {
+        result = false;
+        message = "Username required";
+    }
+    else if (userData.username.length == 0) {
+        result = false;
+        message = "Username cannot be empty";
+    }
+    else if (!userData.hasOwnProperty("password")) {
+        result = false;
+        message = "Password required"
+    }
+    else if (userData.password.length == 0) {
+        result = false;
+        message = "Password cannot be empty";
+    }
+
+    return { isValid: result, errorMessage: message };    
+}
+
+function usernameAlreadyExists(username, callback) {
+    let query = User.find({ "username": username });
+    query.exec((err, matchingUsers) => {
         if (err == null) {
-            res.json({ message: "You have successfully created a new user", user });
+            if (matchingUsers.length == 0) {
+                callback(false);
+            }
+            else {
+                callback(true);
+            }
         }
         else {
-            res.send(err);
+            throw err;
         }
     });
 }
