@@ -2,32 +2,21 @@ let mongoose = require('mongoose');
 let User = require('../models/user');
 
 /*
- * GET /user
- * Returns a list of all users
- */
-function getUsers(req, res) {
-    let query = User.find({});
-    query.exec((err, users) => {
-        if (err == null) {
-            res.json(users);
-        }
-        else {
-            res.send(err);
-        }
-    });
-}
-
-/*
  * POST /user
- * Creates a new user
+ * Create a new user
  */
-function createUser(req, res) {
+function createUser(req, res) { 
     var validateUserDataResult = validateUserData(req.body);
     if (validateUserDataResult.isValid) {
 
-        usernameAlreadyExists(req.body.username, function(isDuplicate) {
-            if (!isDuplicate) {
-                var newUser = new User(req.body);
+        doesUsernameExist(req.body.username, function(usernameAlreadyExists) {
+            if (!usernameAlreadyExists) {
+                var newUser = new User({
+                    username: req.body.username,
+                    password: req.body.password,
+                    listsOwned: [],
+                    listsIsMemberOf: []
+                });
 
                 newUser.save((err, user) => {
                     if (err == null) {
@@ -49,9 +38,66 @@ function createUser(req, res) {
 
 }
 
+/*
+ * GET /user
+ * Return a list of all users
+ */
+function getUsers(req, res) {
+    let query = User.find({});
+    query.exec((err, users) => {
+        if (err == null) {
+            res.json(users);
+        }
+        else {
+            res.send(err);
+        }
+    });
+}
+
+/*
+ * GET /user/:userId
+ * Return user with given userId
+ */
+function getUser(req, res) {
+    User.findById(req.params.userId, (err, user) => {
+        if (err == null) {
+            if (user != null) {
+                res.json(user);
+            }
+            else {
+                res.status(404).json({ message: "No user found" });
+            }
+        }
+        else {
+            res.status(404).send(err);
+        }
+    });
+}
+
+/*
+ * DELETE /user/:userId
+ * Delete user
+ */
+function deleteUser(req, res) {
+    User.findOneAndRemove({ "_id":  req.params.userId }, (err, queryResponse) => {
+        if (err == null) {
+            if (queryResponse != null) {
+                res.json({ message: "Deletion Successful" });
+            }
+            else {
+                res.status(404).json({ message: "Deletion Unsuccessful: No user found"});
+            }
+        }
+        else {
+            res.status(404).json({ message: "Deletion Unsuccessful", err });
+        }
+    });
+}
+
 function validateUserData(userData) {
     var result = true;
     var message = "";
+
     if (!userData.hasOwnProperty('username')) {
         result = false;
         message = "Username required";
@@ -72,7 +118,7 @@ function validateUserData(userData) {
     return { isValid: result, errorMessage: message };    
 }
 
-function usernameAlreadyExists(username, callback) {
+function doesUsernameExist(username, callback) {
     let query = User.find({ "username": username });
     query.exec((err, matchingUsers) => {
         if (err == null) {
@@ -154,4 +200,4 @@ function usernameAlreadyExists(username, callback) {
 // }
 
 //export all the functions
-module.exports = { getUsers, createUser };
+module.exports = { getUsers, getUser, createUser, deleteUser };

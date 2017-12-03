@@ -23,7 +23,7 @@ describe('Users', () => {
                 .get('/user')
                 .end((err, res) => {
                     res.should.have.status(200);
-                    res.body.should.be.a('array');
+                    res.body.should.be.an('array');
                     res.body.length.should.be.eql(0);
                     done();
                 });
@@ -114,9 +114,89 @@ describe('Users', () => {
                         done();
                     });
                 },
-                (res) => {
+                (err) => {
                     throw Error('Something went wrong');
                 });
         });
     });
+
+    describe('GET /user/:userId', () => {
+        it('it should return the user with the given userId', (done) => {
+            let user = {
+                "username": "kaitlyn",
+                "password": "password"
+            };
+            chai.request(server)
+                .post('/user')
+                .send(user)
+                .end((err, res) => {
+                    chai.request(server)
+                    .get('/user/' + res.body.user._id)
+                    .end((err, res) => {
+                        res.should.have.status(200);
+                        res.body.should.have.property('username');
+                        res.body.should.have.property('listsOwned');
+                        res.body.should.have.property('listsIsMemberOf');
+                        res.body.username.should.eq('kaitlyn');
+                        res.body.listsOwned.length.should.eq(0);
+                        res.body.listsIsMemberOf.length.should.eq(0);
+                        done();
+                    });
+                });
+        });
+        it('it should return an error when there is no user with given userId', (done) => {
+            chai.request(server)
+                .get('/user/nobody')
+                .end((err, res) => {
+                    res.should.have.status(404);
+                    done();
+                });
+        });
+    });
+
+    describe('DELETE /user/:userId', () => {
+        it('it should remove the user with the corresponding userId', (done) => {
+            let user = {
+                "username": "chris",
+                "password": "password"
+            };
+            chai.request(server)
+                .post('/user')
+                .send(user)
+                .then((response) => {
+                    chai.request(server)
+                    .delete('/user/' + response.body.user._id)
+                    .then((response) => {
+                        response.should.have.status(200);
+
+                        chai.request(server)
+                        .get('/user/chris')
+                        .end((err, res) => {
+                            res.should.have.status(404);
+                            done();
+                        });
+                    },
+                    (res) => {
+                        throw Error('Something went wrong');
+                    });
+                },
+                (res) => {
+                    throw Error('Something went wrong');
+                });
+        });
+
+        it('it should delete all lists owned and delete user as a member of all its lists', (done) => {
+            throw new Error("Not Implemented");
+        });
+
+        it('it should throw an error if the username does not exist', (done) => {
+            chai.request(server)
+                .delete('/user/nobody')
+                .end((err, res) => {
+                    res.should.have.status(404);
+                    done();
+                });
+        });
+    });
+
 });

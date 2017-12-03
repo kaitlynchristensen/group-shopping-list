@@ -6,6 +6,7 @@ let bodyParser = require('body-parser');
 let port = process.env.PORT || 8080;
 let config = require('config'); // load the db location from the JSON files
 let user = require('./app/routes/user');
+let list = require('./app/routes/list');
 
 router.use(bodyParser.json());                                     
 router.use(bodyParser.urlencoded({extended: true}));               
@@ -22,6 +23,39 @@ router.get("/", (req, res) => res.json({message: "Welcome to our Bookstore!"}));
 router.route("/user")
     .get(user.getUsers)
     .post(user.createUser);
+
+router.route("/user/:userId")
+    .get(user.getUser)
+    .delete(user.deleteUser);
+
+router.route("/list")
+    .post(list.createList);
+
+router.route("/list/:listId")
+    .get(list.getList)
+    .delete(list.deleteList);
+
+router.route("/list/:listId/member/:memberId")
+    .put(list.addMemberToList)
+    .delete(list.removeMemberFromList);
+
+router.route("/list/:listId/item")
+    .put(list.addItemToList);
+
+router.route("/list/:listId/item/:itemId")
+    .delete(list.removeItemFromList);
+
+router.route("/list/:listId/item/:itemId")
+    .get(list.getItemFromList);
+
+router.route("/list/:listId/item/:itemId/description")
+    .put(list.updateItemDescription);
+
+router.route("/list/:listId/item/:itemId/image")
+    .put(list.updateItemImage);
+
+router.route("/list/:listId/item/:itemId/completed")
+    .put(list.updateItemStatus);
 
 router.listen(port);
 console.log("Listening on port " + port);
