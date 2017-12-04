@@ -39,7 +39,7 @@ async function getList(req, res) {
     if (await isMember(req.body.user, req.params.listId)) {
 
         try {
-            var list = await List.findById({ "_id": req.params.listId });
+            var list = await List.findOne({ "_id": req.params.listId });
             res.json(list);
         }
         catch(e) {
@@ -47,7 +47,7 @@ async function getList(req, res) {
         }
     }
     else {
-        res.status(403).json({ message: "You do not have permission to access this list" });
+        res.status(404).json({ message: "List was not found" });
     }
 }
 

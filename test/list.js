@@ -99,13 +99,18 @@ describe('Lists', () => {
         let reqBody;
         let listId;
 
-        before(async () =>  {
+        beforeEach(async () =>  {
             reqBody = {
                 "user": listOwnerId
             };
-            let response = await chai.request(server)
-                .post('/list')
-                .send(reqBody);
+            try {
+                var response = await chai.request(server)
+                    .post('/list')
+                    .send(reqBody);
+            }
+            catch(e) {
+                console.log("hi");
+            }
             listId = response.body.list._id;
         });
 
@@ -116,8 +121,8 @@ describe('Lists', () => {
                     .send(reqBody);
             }
             finally {
-                getListRes.body.should.have.property('list');
-                getListRes.body.list._id.should.eql(listId);
+                getListRes.body.should.have.property('owner');
+                getListRes.body._id.should.eql(listId);
             }
         });
 
@@ -142,7 +147,7 @@ describe('Lists', () => {
                     .send(notAMemberReqBody);
             }
             catch(err) {
-                err.should.have.status(403);
+                err.should.have.status(404);
             }
         });
     });
