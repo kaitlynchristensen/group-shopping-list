@@ -17,81 +17,133 @@ let listMemberOnlyId;
 let listMemberOnlyName = "kathy";
 
 describe('Lists', () => {
-    before((done) => {
-        User.remove({}, (err) => {})
-        .then((err, res) => {
-            let user1 = {
-                "username": listOwnerName,
-                "password": "password"
-            };
-            chai.request(server)
+    before(async () => {
+        let owner = {
+            "username": listOwnerName,
+            "password": "password"
+        };
+
+        let member = {
+            "username": listMemberOnlyName,
+            "password": "password"
+        };
+
+        try {
+            let removeRes = await User.remove({});
+            let createOwnerRes = await chai.request(server)
                 .post('/user')
-                .send(user1)
-                .end((err, res) => {
-                    listOwnerId = res.body.user._id;
-                    let user2 = {
-                        "username": listMemberOnlyName,
-                        "password": "password"
-                    };
-                    chai.request(server)
-                        .post('/user')
-                        .send(user2)
-                        .end((err, res) => {
-                            listMemberOnlyId = res.body.user._id;
-                            done();
-                        });
-                });
-        });
+                .send(owner);
+
+            listOwnerId = createOwnerRes.body.user._id;
+
+            let createMemberRes = chai.request(server)
+                .post('/user')
+                .send(member);
+            
+            listMemberOnlyId = createMemberRes.body.user._id;
+        }
+        catch(e) {}
     });
 
-    beforeEach((done) => { // empty the database before each test
-        List.remove({}, (err) => {
-            done();
-        });
+    beforeEach(async () => { // empty the database before each test
+        await List.remove({});
     });
 
     describe('POST /list', () => {
-        it('it should create a new list owned by the user who created it and with a single member and it should return the new list', (done) => {
+        it('it should create a new list owned by the user who created it and with a single member and it should return the new list', async () => {
             let reqBody = {
                 "user": listOwnerId
             };
-            let newListId;
-            chai.request(server)
-                .post('/list')
-                .send(reqBody)
-                .end((err, res) => {
-                    res.should.have.status(200);
-                    res.body.list.should.have.property("_id");
-                    res.body.list.should.have.property("owner");
-                    res.body.list.should.have.property("members");
-                    res.body.list.owner.should.be.eql(listOwnerId);
-                    res.body.list.members.length.should.eql(1);
-                    res.body.list.members[0].should.eql(listOwnerId);
 
-                    newListId = res.body._id;
+            try {
+                var createListRes = await chai.request(server)
+                    .post('/list')
+                    .send(reqBody);
 
-                    chai.request(server)
-                        .get('/user/' + listOwnerId)
-                        .end((err, res) => {
-                            res.body.user.listsOwned.should.contain(newListId);
-                            res.body.user.listsIsMemberOf.should.contain(newListId);
-                            done();
-                        })
-                });
+                var getOwnerRes = await chai.request(server)
+                    .get('/user/' + listOwnerId)
+                    .send(reqBody);
+            }
+            finally {
+
+                createListRes.should.have.status(200);
+                createListRes.body.list.should.have.property("_id");
+                createListRes.body.list.should.have.property("owner");
+                createListRes.body.list.should.have.property("members");
+                createListRes.body.list.owner.should.be.eql(listOwnerId);
+                createListRes.body.list.members.length.should.eql(1);
+                createListRes.body.list.members[0].should.eql(listOwnerId);
+
+                getOwnerRes.body.listsOwned.should.contain(createListRes.body.list._id);
+                getOwnerRes.body.listsIsMemberOf.should.contain(createListRes.body.list._id);
+            }
+        });
+
+        it("it should return an error if the userId is invalid", async () => {
+            let reqBody = {
+                "user": "nobody"
+            };
+            try {
+                await chai.request(server)
+                    .post('/list')
+                    .send(reqBody);
+                throw new Error("Test should fail");
+            }
+            catch(err) {
+                err.should.have.status(403);
+            }
         });
     });
 
     describe('GET /list/:listId', () => {
-        it('it should return the list corresponding to the id', (done) => {
-            throw new Error("Not Implemented");
+        let reqBody;
+        let listId;
+
+        before(async () =>  {
+            reqBody = {
+                "user": listOwnerId
+            };
+            let response = await chai.request(server)
+                .post('/list')
+                .send(reqBody);
+            listId = response.body.list._id;
         });
 
-        it('it should return an error if the list does not exist', (done) => {
-            throw new Error("Not Implemented");
+        it('it should return the list corresponding to the id', async () => {
+            try {
+                var getListRes = await chai.request(server)
+                    .get('/list/' + listId)
+                    .send(reqBody);
+            }
+            finally {
+                getListRes.body.should.have.property('list');
+                getListRes.body.list._id.should.eql(listId);
+            }
         });
 
-        it("it should return an error if the user is not a member", (done) => {
-            throw new Error("Not Implemented");
+        it('it should return an error if the list does not exist', async () => {
+            try {
+                var getListRes = await chai.request(server)
+                    .get('/list/abcdefghijkl')
+                    .send(reqBody);
+            }
+            catch(err) {
+                err.should.have.status(404);
+            }
+        });
+
+        it("it should return an error if the user is not a member", async () => {
+            let notAMemberReqBody = {
+                "user": "randomcode"
+            }
+            try {
+                var getListRes = await chai.request(server)
+                    .get('/list/' + listId)
+                    .send(notAMemberReqBody);
+            }
+            catch(err) {
+                err.should.have.status(403);
+            }
         });
     });
 

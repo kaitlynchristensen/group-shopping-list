@@ -6,36 +6,50 @@ let User = require('../models/user');
  * POST /list
  * Create new list
  */
-function createList(req, res) {
-    var newList = new List({
-        owner: req.body.user,
-        members: [req.body.user]
-    });
+async function createList(req, res) {
+    if (await isValidUser(req.body.user)) {
 
-    newList.save((err, list) => {
-
-        if (err == null) {
-            User.findOneAndUpdate({ "_id": list.owner }, { $push: { "listsOwned": list._id }, $push: { "listsIsMemberOf": list._id }}, (err, user) => {
-                if (err == null) {
-                    res.json({ message: "You have successfully created a new list", list});
-                }
-                else {
-                    List.findOneAndRemove({ "_id": list._id });
-                    res.json({ message: "List creation was unsuccessful", err});
-                }
-            });
+        var listModel = new List({
+            owner: req.body.user,
+            members: [req.body.user]
+        });
+        var list;
+        try {
+            list = await listModel.save();
+            await User.findOneAndUpdate({ "_id": list.owner }, { $push: { "listsIsMemberOf": list._id, "listsOwned": list._id }});
+            res.json({ message: "You have successfully created a new list", list});
         }
-        else {
-            res.json({ message: "List creation was unsuccessful", err});
+        catch(e) {
+            if (list != null) {
+                List.findOneAndRemove({ "_id": list.list._id });
+            }
+            res.status(404).json({ message: "List was not created", e});
         }
-    });
+    }
+    else {
+        res.status(403).json({ message: "Not a valid user" });
+    }
 }
 
 /*
  * GET /list/:listId
  * Return a list by id
  */
-function getList(req, res) {}
+async function getList(req, res) {
+    if (await isMember(req.body.user, req.params.listId)) {
+
+        try {
+            var list = await List.findById({ "_id": req.params.listId });
+            res.json(list);
+        }
+        catch(e) {
+            res.status(404).json({ message: "List was not found", e });
+        }
+    }
+    else {
+        res.status(403).json({ message: "You do not have permission to access this list" });
+    }
+}
 
 /*
  * PUT /list/:listId/member/:memberId
@@ -90,5 +104,41 @@ function removeItemFromList(req, res) {}
  * Delete a list
  */
 function deleteList(req, res) {}
+
+async function isValidUser(userId) {
+    try {
+        await User.findById(userId);
+        return true;
+    }
+    catch(e) {
+        return false;
+    }
+}
+
+async function isMember(userId, listId) {
+    try {
+        let user = await User.findById(userId);
+        if (user.listsIsMemberOf.filter((list) => list.equals(listId) ).length > 0) {
+            return true;
+        }
+        return false;
+    }
+    catch (e) {
+        return false;
+    }
+}
+
+async function isOwner(userId, listId) {
+    try {
+        let user = await User.findById(userId);
+        if (user.listsOwned.includes(listId)) {
+            return true;
+        }
+        return false;
+    }
+    catch (e) {
+        return false;
+    }
+}
 
 module.exports = { createList, getList, addMemberToList, removeMemberFromList, addItemToList, getItemFromList, updateItemDescription, updateItemImage, updateItemStatus, removeItemFromList, deleteList };
