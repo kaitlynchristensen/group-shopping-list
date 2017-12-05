@@ -2,6 +2,7 @@ var express = require('express');
 var router = express();
 
 let mongoose = require('mongoose');
+mongoose.Promise = require('bluebird');
 let bodyParser = require('body-parser');
 let port = process.env.PORT || 8080;
 let config = require('config'); // load the db location from the JSON files

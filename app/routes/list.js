@@ -2,6 +2,8 @@ let mongoose = require('mongoose');
 let List = require('../models/list');
 let User = require('../models/user');
 
+const all = Promise.all.bind(Promise);
+
 /*
  * POST /list
  * Create new list
@@ -16,7 +18,10 @@ async function createList(req, res) {
         var list;
         try {
             list = await listModel.save();
-            await User.findOneAndUpdate({ "_id": list.owner }, { $push: { "listsIsMemberOf": list._id, "listsOwned": list._id }});
+            await User.findOneAndUpdate(
+                { "_id": list.owner }, 
+                { $push: { "listsIsMemberOf": list._id, "listsOwned": list._id }}
+            );
             res.json({ message: "You have successfully created a new list", list});
         }
         catch(e) {
@@ -55,7 +60,43 @@ async function getList(req, res) {
  * PUT /list/:listId/member/:memberId
  * Add member to list
  */
-function addMemberToList(req, res) {}
+async function addMemberToList(req, res) {
+    if (await isOwner(req.body.user, req.params.listId)) {
+        
+        try {
+            var [list, user] = await all([
+                List.findOneAndUpdate(
+                    { "_id": req.params.listId, members: { $nin: [req.params.memberId] }}, 
+                    { $push: { "members": req.params.memberId }}),
+                User.findOneAndUpdate(
+                    { "_id": req.params.memberId, listsIsMemberOf: { $nin: [req.params.listId] } },
+                    { $push: { "listsIsMemberOf": req.params.listId } })
+            ]);
+
+            res.json(list);
+        }
+        catch(err) {
+            try {
+                if (list) {
+                    List.findOneAndUpdate(
+                        { "_id": req.params.listId }, 
+                        { $set: { "members": list.members }});
+                }
+                if (user) {
+                    User.findOneAndUpdate(
+                        { "_id": req.params.memberId },
+                        { $set: { "listsIsMemberOf": user.listsIsMemberOf } });
+                }
+            }
+            finally {
+                res.status(404).json({ message: "List was not found", err });
+            }
+        }
+    }
+    else {
+        res.status(404).json({ message: "List was not found" });
+    }
+}
 
 /*
  * DELETE /list/:listId/member/:memberId
@@ -131,7 +172,7 @@ async function isMember(userId, listId) {
 async function isOwner(userId, listId) {
     try {
         let user = await User.findById(userId);
-        if (user.listsOwned.includes(listId)) {
+        if (user.listsOwned.filter((list) => list.equals(listId) ).length > 0) {
             return true;
         }
         return false;
