@@ -1,6 +1,7 @@
 let mongoose = require('mongoose');
 let List = require('../models/list');
 let User = require('../models/user');
+let Item = require('../models/item');
 
 const all = Promise.all.bind(Promise);
 
@@ -73,7 +74,13 @@ async function addMemberToList(req, res) {
                     { $push: { "listsIsMemberOf": req.params.listId } })
             ]);
 
-            res.json(list);
+            if (list != null && user != null) {
+                res.json(list);
+            }
+            else {
+                throw new Error("Not found (or the member is already on the list!)");         
+            }   
+
         }
         catch(err) {
             try {
@@ -89,7 +96,7 @@ async function addMemberToList(req, res) {
                 }
             }
             finally {
-                res.status(404).json({ message: "List was not found", err });
+                res.status(404).json({ message: "Could not add member to list", err });
             }
         }
     }
@@ -102,13 +109,85 @@ async function addMemberToList(req, res) {
  * DELETE /list/:listId/member/:memberId
  * Remove member from list
  */
-function removeMemberFromList(req, res) {}
+async function removeMemberFromList(req, res) {
+
+    if (await canRemoveMember(req.body.user, req.params.memberId, req.params.listId)) {
+        
+        try {
+            var list = await List.findOneAndUpdate(
+                { "_id": req.params.listId, members: { $in: [req.params.memberId] }}, 
+                { $pull: { "members": req.params.memberId }});
+        }
+        catch (err) {
+            res.status(404).json({ message: "Could not update list", err });
+            return;
+        }
+
+        try {
+            var user = await User.findOneAndUpdate(
+                { "_id": req.params.memberId, listsIsMemberOf: { $in: [req.params.listId] } },
+                { $pull: { "listsIsMemberOf": req.params.listId } });
+        }
+        catch (err) {
+            try {
+                var list = await List.findOneAndUpdate(
+                    { "_id": req.params.listId, members: { $nin: [req.params.memberId] }}, 
+                    { $push: { "members": req.params.memberId }});
+            }
+            finally {
+                res.status(404).json({ message: "Could not update list", err });
+            }
+        }
+
+        res.status(200).json({ message: "Successfully removed member from list" });
+    }
+    else {
+        res.status(403).json({ message: "You do not have permission to remove this member" });
+    }
+}
 
 /*
  * PUT /list/:listId/item
  * Add item to list
  */
-function addItemToList(req, res) {}
+async function addItemToList(req, res) {
+    if (await isMember(req.body.user, req.params.listId)) {
+        let newItemId;
+
+        var itemModel = new Item({
+            list: req.params.listId,
+            description: req.body.description
+        });
+
+        try {
+            var createItemRes = await itemModel.save();
+        }
+        catch (e) {
+            res.status(500).json({ message: "Item was not created" });
+            return;
+        }
+
+        newItemId = createItemRes.id;
+        
+        try {
+            var updateListRes = await List.findOneAndUpdate(
+                { "_id": req.params.listId }, 
+                { $push: { "items":  newItemId }});
+        }
+        catch (e) {
+            await Item.findOneAndRemove({ "_id": newItemId });
+
+            res.status(500).json({ message: "Item was not created" });
+            return;
+        }
+
+        let item = createItemRes;
+        res.json({ message: "You have successfully added an item to the list", item });
+    }
+    else {
+        res.status(403).json({ message: "You do not have permission to add an item to this list" });
+    }
+}
 
 /*
  * GET list/:listId/item/:itemId
@@ -175,6 +254,31 @@ async function isOwner(userId, listId) {
         if (user.listsOwned.filter((list) => list.equals(listId) ).length > 0) {
             return true;
         }
+        return false;
+    }
+    catch (e) {
+        return false;
+    }
+}
+
+async function canRemoveMember(userId, memberToRemoveId, listId) {
+    try {
+        let user = await User.findById(userId);
+
+        if (user.listsOwned.filter((list) => list.equals(listId) ).length > 0) {
+            if (userId == memberToRemoveId) {
+                return false;
+            }
+            return true;
+        }
+        
+        if (user.listsIsMemberOf.filter((list) => list.equals(listId) ).length > 0) {
+            if (userId != memberToRemoveId) {
+                return false;
+            }
+            return true;
+        }
+
         return false;
     }
     catch (e) {

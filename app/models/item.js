@@ -6,7 +6,7 @@ let UserSchema = new Schema(
         list: { type: Schema.Types.ObjectId, required: true },
         description: { type: String, required: false },
         image: { type: Schema.Types.ObjectId, required: false },
-        completed: { type: Boolean, required: true }
+        completed: { type: Boolean, default: false }
     }
 );
 

@@ -41,7 +41,7 @@ router.route("/list/:listId/member/:memberId")
     .delete(list.removeMemberFromList);
 
 router.route("/list/:listId/item")
-    .put(list.addItemToList);
+    .post(list.addItemToList);
 
 router.route("/list/:listId/item/:itemId")
     .delete(list.removeItemFromList);
