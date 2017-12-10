@@ -137,7 +137,7 @@ describe('Lists', () => {
                 error = e;
             }
             finally {
-                error.should.have.status(404);
+                error.should.have.status(403);
             }
         });
 
@@ -155,7 +155,7 @@ describe('Lists', () => {
                 error = e;
             }
             finally {
-                error.should.have.status(404);
+                error.should.have.status(403);
             }
         });
     });
@@ -530,15 +530,13 @@ describe('Lists', () => {
             let addItemError;
             let newMemberId;
 
-            let newMemberBody = {
-                "username": "pam",
-                "password": "beasly"
-            }
-
             try {
                 var createUserRes = await chai.request(server)
                     .post('/user')
-                    .send(newMemberBody);
+                    .send({
+                        "username": "pam",
+                        "password": "beasly"
+                    });
 
                 newMemberId = createUserRes.body._id;
             }
@@ -546,7 +544,9 @@ describe('Lists', () => {
                 try {
                     var addItemRes = await chai.request(server)
                         .post('/list/' + listId + '/item')
-                        .send(newMemberBody);
+                        .send({
+                            "user": newMemberId
+                        });
                 }
                 catch(e) {
                     addItemError = e;
@@ -559,20 +559,128 @@ describe('Lists', () => {
     });
 
     describe('GET list/:listId/item/:itemId', () => {
+
+        let memberBody;
+        let listId;
+        let itemId;
+        let itemDescription = "Toilet Paper";
+
+        beforeEach(async () =>  {
+            memberBody = {
+                "user": listOwnerId
+            }
+
+            var createListResponse = await chai.request(server)
+                .post('/list')
+                .send(memberBody);
+
+            listId = createListResponse.body.list._id;
+
+            var addItemResponse = await chai.request(server)
+                .post('/list/' + listId + '/item')
+                .send({
+                    "user": listOwnerId,
+                    "description": itemDescription
+                });
+
+            itemId = addItemResponse.body.item._id;
+        });
+
         it('it should return the item with itemId', async () => {
-            throw new Error("Not Implemented");
+            try {
+                var getItemRes = await chai.request(server)
+                    .get('/list/' + listId + '/item/' + itemId)
+                    .send(memberBody);
+            }
+            finally {
+                getItemRes.body.should.have.property("_id");
+                getItemRes.body._id.should.eql(itemId);
+                getItemRes.body.should.have.property("description");
+                getItemRes.body.description.should.eql(itemDescription);
+            }
         });
 
         it('it should return an error if the list does not exist', async () => {
-            throw new Error("Not Implemented");
+            let error;
+            let fakeListId = "nothinghere";
+            try {
+                var getItemRes = await chai.request(server)
+                    .get('/list/' + fakeListId + '/item/' + itemId)
+                    .send(memberBody);
+            }
+            catch (e) {
+                error = e;
+            }
+            finally {
+                error.should.have.status(403);
+            }
         });
 
         it('it should return an error if the item is not on the list', async () => {
-            throw new Error("Not Implemented");
+            let newListId;
+            let itemNotOnListId;
+            let getItemError;
+
+            try {
+                var createListRes = await chai.request(server)
+                    .post('/list')
+                    .send(memberBody);
+
+                newListId = createListRes.body.list._id;
+            }
+            finally {
+                try {
+                    var addItemRes = await chai.request(server)
+                        .post('/list/' + newListId + '/item')
+                        .send(memberBody);
+                }
+                finally {
+                    itemNotOnListId = addItemRes.body.item._id;
+
+                    try {
+                        var getItemRes = await chai.request(server)
+                            .get('/list/' + listId + '/item/' + itemNotOnListId)
+                            .send(memberBody);
+                    }
+                    catch(e) {
+                        getItemError = e;
+                    }
+                    finally {
+                        getItemError.should.have.status(404);
+                    }
+                }
+            }
         });
 
         it("it should return an error if the user is not a member", async () => {
-            throw new Error("Not Implemented");
+            let addItemError;
+            let newMemberId;
+
+            try {
+                var createUserRes = await chai.request(server)
+                    .post('/user')
+                    .send({
+                        "username": "wendy",
+                        "password": "passw0rd"
+                    });
+
+                newMemberId = createUserRes.body._id;
+            }
+            finally {
+                try {
+                    var addItemRes = await chai.request(server)
+                        .get('/list/' + listId + '/item/' + itemId)
+                        .send({
+                            "user": newMemberId
+                        });
+                }
+                catch(e) {
+                    addItemError = e;
+                }
+                finally {
+                    addItemError.should.have.status(403);
+                }
+            }
         });
     });
 

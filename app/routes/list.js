@@ -49,11 +49,11 @@ async function getList(req, res) {
             res.json(list);
         }
         catch(e) {
-            res.status(404).json({ message: "List was not found", e });
+            res.status(500).json({ message: "Could not get list", e });
         }
     }
     else {
-        res.status(404).json({ message: "List was not found" });
+        res.status(403).json({ message: "You don't have permission to access this list" });
     }
 }
 
@@ -193,7 +193,27 @@ async function addItemToList(req, res) {
  * GET list/:listId/item/:itemId
  * Return an item from list
  */
-function getItemFromList(req, res) {}
+async function getItemFromList(req, res) {
+    if (await isMember(req.body.user, req.params.listId)) {
+
+        try {
+            var item = await Item.findOne({ "_id": req.params.itemId });
+
+            if (req.params.listId == item.list.toString()) {
+                res.json(item);
+            }
+            else {
+                res.status(404).json({ message: "Item was not found on this list" });
+            }
+        }
+        catch(e) {
+            res.status(404).json({ message: "Item was not found on this list", e });
+        }
+    }
+    else {
+        res.status(403).json({ message: "You do not have permission to access this list" });
+    }
+}
 
 /*
  * PUT list/:listId/item/:itemId/description
