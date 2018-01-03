@@ -685,33 +685,281 @@ describe('Lists', () => {
     });
 
     describe('PUT list/:listId/item/:itemId/description', () => {
-        it("it should update the item's description", (done) => {
+        let listId;
+        let itemId;
+        let ownerBody;
+
+        beforeEach(async () =>  {
+            ownerBody = {
+                "user": listOwnerId
+            }
+
+            let createListResponse = await chai.request(server)
+                .post('/list')
+                .send(ownerBody);
+
+            listId = createListResponse.body.list._id;
+
+            let addItemResponse = await chai.request(server)
+                .post('/list/' + listId + '/item')
+                .send({
+                    "user": listOwnerId,
+                    "description": "dishsoap"
+                });
+
+            itemId = addItemResponse.body.item._id;
+        });
+
+        it("it should update the item's description when the user is the owner", async () => {
+
+            let newDescription = "a specific brand of dishsoap";
+            
+            let updateDescriptionBody = {
+                user: listOwnerId,
+                description: newDescription
+            }
+            
+            try {
+                var updateDescriptionRes = await chai.request(server)
+                    .put('/list/' + listId + '/item/' + itemId + '/description') 
+                    .send(updateDescriptionBody);
+            }
+            finally {
+                updateDescriptionRes.should.have.status(200);
+                updateDescriptionRes.body.item.should.have.property("_id");
+                updateDescriptionRes.body.item.should.have.property("description");
+                updateDescriptionRes.body.item.description.should.eql(newDescription);
+            }
+        });
+
+        it("it should update the item's description when the user is a member", async () => {
+            let newDescription = "a different brand of dishsoap";
+            
+            try {
+                var createUserRes = await chai.request(server)
+                    .post('/user')
+                    .send({
+                        "username": "lizzo",
+                        "password": "worshipme"
+                    });
+
+                var memberId = createUserRes.body.user._id;
+
+                var addMemberRes = await chai.request(server)
+                    .put('/list/' + listId + '/member/' + memberId)
+                    .send(ownerBody);
+
+                var updateDescriptionBody = {
+                    user: memberId,
+                    description: newDescription
+                };
+
+                var updateDescriptionRes = await chai.request(server)
+                    .put('/list/' + listId + '/item/' + itemId + '/description')
+                    .send(updateDescriptionBody);
+            }
+            finally {
+                updateDescriptionRes.should.have.status(200);
+                updateDescriptionRes.body.item.should.have.property("_id");
+                updateDescriptionRes.body.item.should.have.property("description");
+                updateDescriptionRes.body.item.description.should.eql(newDescription);
+            }
+        });
+
+        it("it should remove the item's description if an empty string is given", async () => {
+            let emptyDescription = "";
+            
+            let updateDescriptionBody = {
+                user: listOwnerId,
+                description: emptyDescription
+            }
+            
+            try {
+                var updateDescriptionRes = await chai.request(server)
+                    .put('/list/' + listId + '/item/' + itemId + '/description')
+                    .send(updateDescriptionBody);
+            }
+            finally {
+                updateDescriptionRes.should.have.status(200);
+                updateDescriptionRes.body.item.should.have.property("_id");
+                updateDescriptionRes.body.item.should.have.property("description");
+                updateDescriptionRes.body.item.description.should.eql(emptyDescription);
+            }
+        });
+
+        it('it should return an error if the list does not exist', async () => {
+            let newDescription = "a descripton";
+            
+            let updateDescriptionBody = {
+                user: listOwnerId,
+                description: newDescription
+            };
+            
+            try {
+                var updateDescriptionRes = await chai.request(server)
+                    .put('/list/notalist/item/' + itemId + '/description')
+                    .send(updateDescriptionBody);
+            }
+            catch (err) {
+                var updateDescriptionError = err;
+            }
+            finally {
+                try {
+                    var getItemRes = await chai.request(server)
+                        .get('/list/' + listId + '/item/' + itemId)
+                        .send(ownerBody);
+                }
+                finally {
+                    updateDescriptionError.should.have.status(403);
+                    getItemRes.body.description.should.not.eql(newDescription);
+            
+                }
+            }
+        });
+
+        it('it should return an error if the item is not on the list', async () => {
+            let newDescription = "market pantry dishsoap";
+            
+            let updateDescriptionBody = {
+                user: listOwnerId,
+                description: newDescription
+            };
+            
+            try {
+                let createNewListRes = await chai.request(server)
+                    .post('/list')
+                    .send(ownerBody);
+
+                var emptyListId = createNewListRes.body.list._id; 
+
+                var updateDescriptionRes = await chai.request(server)
+                    .put('/list/' + emptyListId + '/item/' + itemId + '/description')
+                    .send(updateDescriptionBody);
+            }
+            catch (err) {
+                var updateDescriptionErr = err;
+            }
+            finally {
+                try {
+                    var getItemRes = await chai.request(server)
+                        .get('/list/' + listId + '/item/' + itemId)
+                        .send(ownerBody);
+                }
+                finally {
+                    updateDescriptionErr.should.have.status(403);
+                    getItemRes.body.description.should.not.eql(newDescription);
+            
+                }    
+            }
+        });
+
+        it('it should return an error if there is no description field in request', async () => {
+            
+            let updateDescriptionBody = {
+                user: listOwnerId
+            };
+
+            let oldDescription = "filler";
+            
+            try {
+                await chai.request(server)
+                    .put('/list/' + listId + '/item/' + itemId)
+                    .send({
+                        "user": listOwnerId,
+                        "description": oldDescription
+                    });
+
+                var updateDescriptionRes = await chai.request(server)
+                    .put('/list/' + listId + '/item/' + itemId + '/description')
+                    .send(updateDescriptionBody);
+
+                var getItemRes = await chai.request(server)
+                    .get('/list/' + listId + '/item/' + itemId)
+                    .send(ownerBody);
+            }
+            catch (err) {
+                var error = err;
+            }
+            finally {
+                error.should.have.status(400);
+                getItemRes.body.item.description.should.eql(oldDescription);
+            }
+        });
+
+        it("it should return an error if the user is not a member", async () => {
+            let newDescription = "2 bottles of dishsoap";
+            
+            try {
+                var createUserRes = await chai.request(server)
+                    .post('/user')
+                    .send({
+                        "username": "pizza",
+                        "password": "pizza"
+                    });
+
+                var nonMemberId = createUserRes.body.user._id;
+
+                var updateDescriptionBody = {
+                    user: nonMemberId,
+                    description: newDescription
+                };
+
+                var updateDescriptionRes = await chai.request(server)
+                    .put('/list/' + listId + '/item/' + itemId + '/description')
+                    .send(updateDescriptionBody);
+
+                var getItemRes = await chai.request(server)
+                    .get('/list/' + listId + '/item/' + itemId)
+                    .send(ownerBody);
+            }
+            finally {
+                updateDescriptionRes.should.have.status(403);
+                getItemRes.body.item.description.should.not.eql(newDescription);
+            }
+        });
+    });
+
+    describe('PUT list/:listId/item/:itemId/complete', () => {
+        
+        beforeEach(async () =>  {
+            ownerBody = {
+                "user": listOwnerId
+            }
+
+            var createListResponse = await chai.request(server)
+                .post('/list')
+                .send(ownerBody);
+
+            listId = createListResponse.body.list._id;
+        });
+        
+        it("it should update the item's completion status when the user is the owner", async () => {
             throw new Error("Not Implemented");
         });
 
-        it("it should remove the item's description if an empty string is given", (done) => {
+        it("it should update the item's completion status when the user is a member", async () => {
             throw new Error("Not Implemented");
         });
 
-        it('it should return an error if the list does not exist', (done) => {
+        it('it should return an error if the list does not exist', async () => {
             throw new Error("Not Implemented");
         });
 
-        it('it should return an error if the item is not on the list', (done) => {
+        it('it should return an error if the item is not on the list', async () => {
             throw new Error("Not Implemented");
         });
 
-        it('it should return an error if there is no description field in request', (done) => {
+        it('it should return an error if there is no "complete" field in request', async () => {
             throw new Error("Not Implemented");
         });
 
-        it("it should return an error if the user is not a member", (done) => {
+        it("it should return an error if the user is not a member", async () => {
             throw new Error("Not Implemented");
         });
     });
 
     describe('PUT list/:listId/item/:itemId/image', () => {
-        it("it should replace the item's image and mark it as complete", (done) => {
+        it("it should replace the item's image", (done) => {
             throw new Error("Not Implemented. More tests are necessary here.");
         });
     });

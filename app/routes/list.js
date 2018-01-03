@@ -219,7 +219,27 @@ async function getItemFromList(req, res) {
  * PUT list/:listId/item/:itemId/description
  * Update an item's description
  */
-function updateItemDescription(req, res) {}
+async function updateItemDescription(req, res) {
+    let itemId = req.params.itemId;
+    if (await canEditItem(req.body.user, req.params.listId, itemId)) {
+        try {
+            var updateListRes = await Item.findOneAndUpdate(
+                { "_id": itemId }, 
+                { $set: { "description":  req.body.description }},
+                { new: true });
+        }
+        catch (e) {
+            res.status(400).json({ message: "Item could not be updated" });
+            return;
+        }
+
+        let item = updateListRes;
+        res.json({ message: "You have successfully updated the item's description", item });
+    }
+    else {
+        res.status(403).json({ message: "You do not have permission to update this item" });
+    }
+}
 
  /*
  * PUT list/:listId/item/:itemId/image
@@ -299,6 +319,25 @@ async function canRemoveMember(userId, memberToRemoveId, listId) {
             return true;
         }
 
+        return false;
+    }
+    catch (e) {
+        return false;
+    }
+}
+
+async function canEditItem(userId, listId, itemId) {
+    try {
+        let user = await User.findById(userId);
+        if (user.listsIsMemberOf.filter((list) => list.equals(listId) ).length > 0) {
+
+            let item = await Item.findById(itemId);
+            if (item.list.equals(listId)) {
+                return true;
+            }
+
+            return false;
+        }
         return false;
     }
     catch (e) {
